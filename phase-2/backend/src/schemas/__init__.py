@@ -1,7 +1,7 @@
 """Schemas module initialization."""
-from .base import BaseResponse, ErrorResponse
-from .user import UserCreate, UserLogin, UserResponse, Token, TokenData
-from .task import TaskCreate, TaskUpdate, TaskResponse
+from src.schemas.base import BaseResponse, ErrorResponse
+from src.schemas.user import UserCreate, UserLogin, UserResponse, Token, TokenData
+from src.schemas.task import TaskCreate, TaskUpdate, TaskResponse
 
 __all__ = [
     "BaseResponse",
