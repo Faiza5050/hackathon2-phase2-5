@@ -1,5 +1,6 @@
 """Authentication service for session and token management."""
 from datetime import datetime, timedelta
+from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import hashlib
@@ -19,40 +20,40 @@ class AuthService:
     def __init__(self, db: Session):
         self.db = db
     
-    def create_session(self, user: User) -> tuple[str, datetime]:
+    def create_session(self, user: User) -> Tuple[str, datetime]:
         """
         Create a new session for a user.
-        
+
         Args:
             user: User object
-            
+
         Returns:
             Tuple of (access_token, expires_at)
         """
-        # Create JWT token
+        # Create JWT token with user_id and email
         expires_delta = timedelta(days=settings.ACCESS_TOKEN_EXPIRE_DAYS)
         access_token = create_access_token(
-            data={"user_id": user.id},
+            data={"user_id": user.id, "email": user.email},
             expires_delta=expires_delta
         )
         expires_at = datetime.utcnow() + expires_delta
-        
+
         # Store session hash for potential revocation
         token_hash = hashlib.sha256(access_token.encode()).hexdigest()
-        
+
         session = SessionModel(
             user_id=user.id,
             token_hash=token_hash,
             expires_at=expires_at
         )
-        
+
         self.db.add(session)
         self.db.commit()
-        
+
         logger.info(f"Session created for user: {user.email}")
         return access_token, expires_at
     
-    def validate_token(self, token: str) -> dict | None:
+    def validate_token(self, token: str) -> Optional[dict]:
         """
         Validate a JWT token.
         

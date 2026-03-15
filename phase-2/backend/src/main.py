@@ -1,6 +1,9 @@
 """FastAPI application entry point."""
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import logging
 
 from .core.config import settings
@@ -15,11 +18,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize rate limiter
+# Limits: 10 requests per minute for auth endpoints to prevent brute force
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[]  # No default limits, set per-endpoint
+)
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     debug=settings.DEBUG,
     version="0.1.0"
 )
+
+# Add rate limiter to app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware for frontend communication
 app.add_middleware(
@@ -35,7 +49,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(tasks_router, prefix="/api")
 
-logger.info("FastAPI application initialized")
+logger.info("FastAPI application initialized with rate limiting")
 
 
 @app.get("/")

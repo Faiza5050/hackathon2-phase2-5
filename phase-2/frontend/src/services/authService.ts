@@ -2,7 +2,7 @@
  * Authentication service for API calls
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
 export interface User {
   id: string;
@@ -21,15 +21,24 @@ export interface AuthError {
   detail: string;
 }
 
+interface JWTPayload {
+  user_id: string;
+  email: string;
+  exp: number;
+  iat: number;
+}
+
 class AuthService {
+  // Generic request function
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const token = localStorage.getItem('access_token');
-    
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
     };
 
+    // Direct fetch call to backend
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers: {
@@ -39,6 +48,7 @@ class AuthService {
     });
 
     if (!response.ok) {
+      // Try to parse error JSON
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
       throw new Error(error.detail || `HTTP ${response.status}`);
     }
@@ -46,48 +56,129 @@ class AuthService {
     return response.json();
   }
 
-  async register(email: string, password: string): Promise<User> {
-    return this.request<User>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-  }
-
-  async login(email: string, password: string): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-  }
-
-  async logout(): Promise<void> {
+  // Decode JWT token to extract payload
+  private decodeToken(token: string): JWTPayload | null {
     try {
-      await this.request<void>('/auth/logout', {
-        method: 'POST',
-      });
+      const payload = token.split('.')[1];
+      const decoded = atob(payload);
+      return JSON.parse(decoded);
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Failed to decode token:', error);
+      return null;
     }
   }
 
+  // Signup function
+  async register(email: string, password: string): Promise<User> {
+    // Direct fetch to backend signup endpoint
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Signup failed' }));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Login function
+  async login(email: string, password: string): Promise<LoginResponse> {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Login failed' }));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Store token in localStorage
+    localStorage.setItem('access_token', data.access_token);
+    
+    return data;
+  }
+
+  // Logout
+  async logout(): Promise<void> {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Always clear token from localStorage
+      localStorage.removeItem('access_token');
+    }
+  }
+
+  // Get current user from JWT token
   async getCurrentUser(): Promise<User | null> {
     try {
-      // For now, we decode the token to get user info
-      // In a real app, you might have a /auth/me endpoint
       const token = localStorage.getItem('access_token');
       if (!token) return null;
 
-      // Decode JWT payload (base64)
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = this.decodeToken(token);
+      if (!payload) return null;
+
       return {
         id: payload.user_id,
-        email: '', // We don't have email in token, would need /auth/me endpoint
-        created_at: '',
+        email: payload.email, // Now includes email from JWT token
+        created_at: '', // Not available in token, use /api/auth/me for full details
       };
     } catch (error) {
       console.error('Get current user error:', error);
       return null;
     }
+  }
+
+  // Get full current user details from API
+  async getCurrentUserDetails(): Promise<User | null> {
+    try {
+      const response = await fetch(`${API_URL}/auth/me`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Get current user details error:', error);
+      return null;
+    }
+  }
+
+  // Check if user is authenticated
+  isAuthenticated(): boolean {
+    const token = localStorage.getItem('access_token');
+    if (!token) return false;
+
+    const payload = this.decodeToken(token);
+    if (!payload) return false;
+
+    // Check if token is expired
+    const now = Math.floor(Date.now() / 1000);
+    return payload.exp > now;
+  }
+
+  // Get token
+  getToken(): string | null {
+    return localStorage.getItem('access_token');
   }
 }
 

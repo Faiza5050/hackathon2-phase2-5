@@ -1,5 +1,4 @@
 """Application configuration and settings."""
-import os
 from pydantic_settings import BaseSettings
 
 
@@ -12,7 +11,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Phase-2 Features"
 
     # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/hackathon2_phase2"
+    DATABASE_URL: str
 
     # Security
     SECRET_KEY: str = "change-this-in-production-use-openssl-rand-hex-32"
@@ -28,6 +27,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"  # add this to be safe
 
 
 settings = Settings()

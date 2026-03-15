@@ -1,8 +1,9 @@
-"""Authentication context provider for managing user auth state."""
+// """Authentication context provider for managing user auth state."""
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authService, type User } from '../services/authService';
+import { useToast } from './ToastContext';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   // Check for existing session on mount
   useEffect(() => {
@@ -53,14 +55,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.login(email, password);
       localStorage.setItem('access_token', response.access_token);
       setUser(response.user);
+      toast.success('Welcome back!');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       setError(errorMessage);
+      
+      // Handle rate limiting
+      if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('too many')) {
+        toast.error('Too many login attempts. Please try again later.', 8000);
+      } else {
+        toast.error(errorMessage);
+      }
+      
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   const register = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
@@ -69,14 +80,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authService.register(email, password);
       // Auto-login after successful registration
       await login(email, password);
+      toast.success('Account created successfully!');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
       setError(errorMessage);
+      toast.error(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [login]);
+  }, [login, toast]);
 
   const logout = useCallback(async () => {
     try {
@@ -86,8 +99,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       localStorage.removeItem('access_token');
       setUser(null);
+      toast.info('You have been logged out');
     }
-  }, []);
+  }, [toast]);
 
   const clearError = useCallback(() => {
     setError(null);

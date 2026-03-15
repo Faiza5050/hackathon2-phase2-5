@@ -1,6 +1,7 @@
 """User Pydantic schemas for request/response validation."""
 from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from datetime import datetime
+from uuid import UUID
 from typing import Optional
 import re
 
@@ -39,7 +40,7 @@ class UserResponse(BaseModel):
     """Schema for user response."""
     model_config = ConfigDict(from_attributes=True)
     
-    id: str
+    id: UUID
     email: str
     created_at: datetime
 

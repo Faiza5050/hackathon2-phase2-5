@@ -19,25 +19,28 @@ async def get_tasks(
     db: Session = Depends(get_db),
     status: Optional[str] = Query(None, description="Filter by status"),
     sort_by: str = Query("created_at", description="Sort field"),
-    order: str = Query("desc", description="Sort order")
+    order: str = Query("desc", description="Sort order"),
+    search: Optional[str] = Query(None, description="Search in title and description")
 ):
     """
     Get all tasks for the authenticated user.
-    
+
     - **status**: Optional filter (pending, in_progress, completed)
     - **sort_by**: Sort field (created_at, due_date, status)
     - **order**: Sort order (asc, desc)
+    - **search**: Optional search query (searches title and description, case-insensitive)
     """
     user_id = current_user["user_id"]
     task_service = TaskService(db)
-    
+
     tasks = task_service.get_user_tasks(
         user_id=user_id,
         status=status,
         sort_by=sort_by,
-        order=order
+        order=order,
+        search=search
     )
-    
+
     logger.info(f"Retrieved {len(tasks)} tasks for user {user_id}")
     return tasks
 
