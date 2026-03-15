@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Text, DateTime, ForeignKey, CheckConstrai
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-from .database import Base
+from src.core.database import Base
 
 
 class Task(Base):

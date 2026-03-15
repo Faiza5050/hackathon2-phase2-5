@@ -1,8 +1,8 @@
 """Task service for business logic related to task management."""
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Optional, List
 import logging
 
 from ..models.task import Task
@@ -48,33 +48,42 @@ class TaskService:
         user_id: str,
         status: Optional[str] = None,
         sort_by: str = "created_at",
-        order: str = "desc"
-    ) -> list[Task]:
+        order: str = "desc",
+        search: Optional[str] = None
+    ) -> List[Task]:
         """
-        Get all tasks for a user with optional filtering and sorting.
-        
+        Get all tasks for a user with optional filtering, sorting, and search.
+
         Args:
             user_id: User ID
             status: Optional status filter
             sort_by: Sort field (created_at, due_date, status)
             order: Sort order (asc, desc)
-            
+            search: Optional search query (searches title and description)
+
         Returns:
             List of Task objects
         """
         stmt = select(Task).where(Task.user_id == user_id)
-        
+
+        # Apply search filter (case-insensitive search in title and description)
+        if search:
+            search_pattern = f"%{search}%"
+            stmt = stmt.where(
+                (Task.title.ilike(search_pattern)) | (Task.description.ilike(search_pattern))
+            )
+
         # Apply status filter
         if status:
             stmt = stmt.where(Task.status == status)
-        
+
         # Apply sorting
         sort_column = getattr(Task, sort_by, Task.created_at)
         if order == "desc":
             stmt = stmt.order_by(sort_column.desc())
         else:
             stmt = stmt.order_by(sort_column.asc())
-        
+
         tasks = self.db.execute(stmt).scalars().all()
         logger.info(f"Retrieved {len(tasks)} tasks for user {user_id}")
         return tasks
@@ -168,10 +177,10 @@ class TaskService:
         completed = sum(1 for t in tasks if t.status == "completed")
         
         # Count overdue tasks (due date in past and not completed)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         overdue = sum(
             1 for t in tasks
-            if t.due_date and t.due_date < now and t.status != "completed"
+            if t.due_date and t.due_date.replace(tzinfo=None) < now.replace(tzinfo=None) and t.status != "completed"
         )
         
         return {
@@ -182,7 +191,7 @@ class TaskService:
             "overdue_tasks": overdue
         }
     
-    def get_recent_tasks(self, user_id: str, limit: int = 5) -> list[Task]:
+    def get_recent_tasks(self, user_id: str, limit: int = 5) -> List[Task]:
         """
         Get most recent tasks for dashboard.
         

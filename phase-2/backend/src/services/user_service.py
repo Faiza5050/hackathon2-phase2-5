@@ -1,6 +1,7 @@
 """User service for business logic related to user management."""
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from typing import Optional
 from ..models.user import User
 from ..schemas.user import UserCreate
 from ..core.security import get_password_hash
@@ -48,33 +49,33 @@ class UserService:
         logger.info(f"User created successfully: {db_user.email}")
         return db_user
     
-    def get_user_by_email(self, email: str) -> User | None:
+    def get_user_by_email(self, email: str) -> Optional[User]:
         """
         Get user by email address.
-        
+
         Args:
             email: User email
-            
+
         Returns:
             User object or None if not found
         """
         stmt = select(User).where(User.email == email)
         return self.db.execute(stmt).scalar_one_or_none()
-    
-    def get_user_by_id(self, user_id: str) -> User | None:
+
+    def get_user_by_id(self, user_id: str) -> Optional[User]:
         """
         Get user by ID.
-        
+
         Args:
             user_id: User ID
-            
+
         Returns:
             User object or None if not found
         """
         stmt = select(User).where(User.id == user_id)
         return self.db.execute(stmt).scalar_one_or_none()
-    
-    def authenticate_user(self, email: str, password: str) -> User | None:
+
+    def authenticate_user(self, email: str, password: str) -> Optional[User]:
         """
         Authenticate user with email and password.
         

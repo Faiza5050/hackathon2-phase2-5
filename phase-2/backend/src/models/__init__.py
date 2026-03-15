@@ -1,5 +1,5 @@
 """SQLAlchemy Base model and model imports."""
-from src.models.database import Base
+from src.core.database import Base
 
 # Import all models here to ensure they are registered with Base
 from src.models.user import User
